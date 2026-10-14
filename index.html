@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clipboard test</title>
+<style>
+  body { font: 17px -apple-system, system-ui, sans-serif; margin: 0; padding: 20px 16px; color: #111; background: #fff; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .env { color: #666; font-size: 14px; margin-bottom: 20px; word-break: break-word; }
+  button { display: block; width: 100%; font-size: 18px; padding: 16px; margin: 12px 0 4px; border: 0; border-radius: 12px; background: #e5003d; color: #fff; }
+  button.secondary { background: #222; }
+  .res { font-size: 15px; min-height: 20px; margin-bottom: 8px; }
+  .ok { color: #0a7d2c; } .fail { color: #c00; }
+  input { width: 100%; box-sizing: border-box; font-size: 16px; padding: 12px; margin-top: 8px; border: 1px solid #ccc; border-radius: 10px; }
+  p.hint { font-size: 14px; color: #555; }
+</style>
+</head>
+<body>
+<h1>Тест буфера обмена</h1>
+<div class="env" id="env"></div>
+
+<button id="copy">1. Тап: скопировать ссылку</button>
+<div class="res" id="copyRes"></div>
+
+<p class="hint">2. Зажми поле ниже → «Вставить». Должно появиться clipster.com/r/clipboardtest…</p>
+<input id="paste" placeholder="Вставь сюда">
+<div class="res" id="pasteRes"></div>
+
+<button class="secondary" id="go">3. Скопировать и открыть OneLink</button>
+<div class="res" id="goRes"></div>
+
+<script>
+  const LINK = 'https://clipster.com/r/clipboardtest';
+  const ONELINK = 'https://clipster.onelink.me/2HTk/invite?deep_link_value=ref%3Dclipboardtest';
+  const ua = navigator.userAgent;
+  const app = /Instagram/i.test(ua) ? 'Instagram'
+    : /musical_ly|TikTok|BytedanceWebview|trill/i.test(ua) ? 'TikTok'
+    : /FBAN|FBAV/i.test(ua) ? 'Facebook'
+    : /Discord/i.test(ua) ? 'Discord'
+    : /Telegram/i.test(ua) ? 'Telegram'
+    : /CriOS/i.test(ua) ? 'Chrome iOS'
+    : /Safari/i.test(ua) ? 'Safari или SFSafariViewController'
+    : 'неизвестно (WebView)';
+  env.textContent = 'Браузер: ' + app + ' · clipboard API: ' + (navigator.clipboard ? 'есть' : 'нет') + ' · ' + ua;
+
+  const log = (step, result) => {
+    const q = new URLSearchParams({ step, result, app, api: navigator.clipboard ? '1' : '0', ua });
+    fetch('/log?' + q.toString(), { keepalive: true }).catch(() => {});
+  };
+  log('open', 'page loaded');
+
+  const execCopy = text => {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly', ''); ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+    let ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta); return ok;
+  };
+
+  const copy = async (text, el, step) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      el.className = 'res ok'; el.textContent = 'clipboard.writeText: OK'; log(step, 'writeText OK');
+      return true;
+    } catch (e) {
+      const ok = execCopy(text);
+      el.className = 'res ' + (ok ? 'ok' : 'fail');
+      el.textContent = 'writeText: ' + (e && e.name) + ' · execCommand: ' + (ok ? 'OK' : 'FAILED');
+      log(step, 'writeText ' + (e && e.name) + ', execCommand ' + (ok ? 'OK' : 'FAILED'));
+      return ok;
+    }
+  };
+
+  document.getElementById('copy').onclick = () => copy(LINK + '?step=1', copyRes, 'tap-copy');
+
+  paste.addEventListener('input', () => {
+    const v = paste.value.trim();
+    const ok = v.includes('clipster.com/r/clipboardtest');
+    pasteRes.className = 'res ' + (ok ? 'ok' : 'fail');
+    pasteRes.textContent = ok ? 'В буфере наша ссылка' : 'В буфере другое: ' + v.slice(0, 60);
+    log('paste-check', ok ? 'clipboard has link' : 'clipboard has other: ' + v.slice(0, 60));
+  });
+
+  go.onclick = async () => {
+    await copy(LINK + '?step=3', goRes, 'tap-copy-and-go');
+    log('navigate', 'to onelink');
+    location.href = ONELINK;
+  };
+</script>
+</body>
+</html>
